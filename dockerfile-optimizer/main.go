@@ -22,6 +22,8 @@ import (
 	"strings"
 
 	"dagger/dockerfile-optimizer/internal/dagger"
+
+	"github.com/google/uuid"
 )
 
 type DockerfileOptimizer struct{}
@@ -82,6 +84,29 @@ $extra_context
 `)
 
 	return llm
+}
+
+// Create a new PullRequest with the changes in the workspace, the given title and body, returns the PR URL
+func createPR(ctx context.Context, githubToken *dagger.Secret, repoURL string, w *dagger.Workspace, path, llmAnswer string) (string, error) {
+	// generate a random branch name
+	branchName := "dockerfile-improvements-" + uuid.New().String()[:8]
+	// The changeset needs to contain only the Dockerfile otherwise the diff will fail (FIXME?)
+	changeset := dag.Directory().WithFile(path, w.Workdir().File(path))
+	// Create a new feature branch
+	featureBranch := dag.FeatureBranch(githubToken, repoURL, branchName).
+		WithChanges(changeset)
+
+	// Make sure changes have been made to the workspace
+	diff, err := featureBranch.Diff(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	if diff == "" {
+		return "", fmt.Errorf("got empty diff on feature branch (llm did not make any changes)")
+	}
+
+	return featureBranch.PullRequest(ctx, "Optimizing Dockerfile", llmAnswer)
 }
 
 // Optimize a Dockerfile
@@ -151,12 +176,6 @@ func (m *DockerfileOptimizer) OptimizeDockerfile(ctx context.Context, githubToke
 		return "", fmt.Errorf("failed to get workspace diff: %w", err)
 	}
 
-	// DEBUG
-	dag.Container().From("cgr.dev/chainguard/wolfi-base:latest").
-		WithMountedDirectory("/orig_workspace", originalWorkdir).
-		WithMountedDirectory("/workspace", lastState.Workdir()).
-		Terminal().Sync(ctx)
-
 	if len(diff) == 0 {
 		return answer, fmt.Errorf("failed to optimize the Dockerfile")
 	}
@@ -165,28 +184,5 @@ func (m *DockerfileOptimizer) OptimizeDockerfile(ctx context.Context, githubToke
 	answer += fmt.Sprintf("- The original image has %d layers and is %d bytes in size.\n", originalImgInfo[0], originalImgInfo[1])
 	answer += fmt.Sprintf("- The optimized image has %d layers and is %d bytes in size.\n", lastImgInfo[0], lastImgInfo[1])
 
-	return answer, nil
+	return createPR(ctx, githubToken, repoURL, lastState, dockerfile, answer)
 }
-
-// // Create a new PullRequest with the changes in the workspace, the given title and body, returns the PR URL
-// func (w *Workspace) CreatePR(ctx context.Context, title, body string) (string, error) {
-// 	// generate a random branch name
-// 	branchName := "dockerfile-improvements-" + uuid.New().String()[:8]
-// 	// The changeset needs to contain only the Dockerfile otherwise the diff will fail (FIXME?)
-// 	changeset := dag.Directory().WithFile("Dockerfile", w.Container.File("Dockerfile"))
-// 	// Create a new feature branch
-// 	featureBranch := dag.FeatureBranch(w.GitHubToken, w.RepoURL, branchName).
-// 		WithChanges(changeset)
-
-// 	// Make sure changes have been made to the workspace
-// 	diff, err := featureBranch.Diff(ctx)
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	if diff == "" {
-// 		return "", fmt.Errorf("got empty diff on feature branch (llm did not make any changes)")
-// 	}
-
-// 	return featureBranch.PullRequest(ctx, title, body)
-// }
