@@ -23,6 +23,7 @@ import (
 
 	"dagger/dockerfile-optimizer/internal/dagger"
 
+	"github.com/dustin/go-humanize"
 	"github.com/google/uuid"
 )
 
@@ -181,8 +182,8 @@ func (m *DockerfileOptimizer) OptimizeDockerfile(ctx context.Context, githubToke
 	}
 
 	answer += "\n\nImage info:\n"
-	answer += fmt.Sprintf("- The original image has %d layers and is %d bytes in size.\n", originalImgInfo[0], originalImgInfo[1])
-	answer += fmt.Sprintf("- The optimized image has %d layers and is %d bytes in size.\n", lastImgInfo[0], lastImgInfo[1])
+	answer += fmt.Sprintf("- The original image has %d layers and is %s in size.\n", originalImgInfo[0], humanize.Bytes(uint64(originalImgInfo[1])))
+	answer += fmt.Sprintf("- The optimized image has %d layers and is %s in size.\n", lastImgInfo[0], humanize.Bytes(uint64(lastImgInfo[1])))
 
 	return createPR(ctx, githubToken, repoURL, lastState, dockerfile, answer)
 }
