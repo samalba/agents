@@ -16,19 +16,16 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 	"strings"
 
 	"dagger/workspace/internal/dagger"
-
-	"github.com/google/uuid"
 )
 
 type Workspace struct {
-	// The workspace's container state
+	// The workspace's directory state
 	// +internal-use-only
-	Container *dagger.Container
+	Workdir *dagger.Directory
 	// Repository URL
 	// +internal-use-only
 	RepoURL string
@@ -47,37 +44,20 @@ func New(githubToken *dagger.Secret, repoURL string) Workspace {
 
 	return Workspace{
 		// Build a base container optimized for Go development
-		Container: dag.Container().
-			From("cgr.dev/chainguard/wolfi-base").
-			WithMountedDirectory("/src", repo).
-			WithWorkdir("/src"),
+		Workdir:     repo,
 		RepoURL:     repoURL,
 		GitHubToken: githubToken,
 	}
 }
 
-// func (w *Workspace) Ctr(ctx context.Context) *dagger.Container {
-// 	return w.Container
-// }
-
-// Ensure the path is relative to the git clone directory
-func translatePath(path string) string {
-	if strings.HasPrefix(path, "/src") {
-		return path
-	}
-	return filepath.Join("/src", path)
-}
-
 // Read a file at the given path
 func (w *Workspace) Read(ctx context.Context, path string) (string, error) {
-	path = translatePath(path)
-	return w.Container.File(path).Contents(ctx)
+	return w.Workdir.File(path).Contents(ctx)
 }
 
 // Write a file at the given path with the given content
 func (w Workspace) Write(path, content string) Workspace {
-	path = translatePath(path)
-	w.Container = w.Container.WithNewFile(path, content)
+	w.Workdir = w.Workdir.WithNewFile(path, content)
 	return w
 }
 
@@ -85,37 +65,8 @@ func (w Workspace) Write(path, content string) Workspace {
 func (w *Workspace) Build(ctx context.Context, path string) error {
 	// Split directory and filename from path
 	dirname, filename := filepath.Split(path)
-	path = translatePath(path)
-	_, err := w.Container.Build(w.Container.Directory(dirname), dagger.ContainerBuildOpts{Dockerfile: filename}).Sync(ctx)
+	_, err := dag.Container().
+		Build(w.Workdir.Directory(dirname), dagger.ContainerBuildOpts{Dockerfile: filename}).
+		Sync(ctx)
 	return err
-}
-
-// Find files that match the given glob pattern
-func (w *Workspace) Find(ctx context.Context,
-	pattern string,
-) ([]string, error) {
-	return w.Container.Directory("/src").Glob(ctx, pattern)
-}
-
-// Create a new PullRequest with the changes in the workspace, the given title and body, returns the PR URL
-func (w *Workspace) CreatePR(ctx context.Context, title, body string) (string, error) {
-	// generate a random branch name
-	branchName := "dockerfile-improvements-" + uuid.New().String()[:8]
-	// The changeset needs to contain only the Dockerfile otherwise the diff will fail (FIXME?)
-	changeset := dag.Directory().WithFile("Dockerfile", w.Container.File("Dockerfile"))
-	// Create a new feature branch
-	featureBranch := dag.FeatureBranch(w.GitHubToken, w.RepoURL, branchName).
-		WithChanges(changeset)
-
-	// Make sure changes have been made to the workspace
-	diff, err := featureBranch.Diff(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	if diff == "" {
-		return "", fmt.Errorf("got empty diff on feature branch (llm did not make any changes)")
-	}
-
-	return featureBranch.PullRequest(ctx, title, body)
 }
