@@ -75,7 +75,7 @@ Use the read, write and build tools to complete the following assignment.
 
 - Build the Dockerfile in the provided workspace at the path: "$dockerfile"
 - Optimize the Dockerfile for reducing its size, number of layers, and build time. And if possible, increasing the security level of the image by implementing best practices.
-- Ensure to not downgrade any version found in the Dockerfile.
+- Make sure to never downgrade any image version found in the Dockerfile.
 - If the Dockerfile is already optimized, just return an explanation that you couldn't optimize it.
 - Make sure the Dockerfile builds correctly before going to the next step.
 - If you have changes to make, write the optimized Dockerfile to the workspace, at the same path "$dockerfile".

@@ -8,7 +8,7 @@
     {
       "name": "feature-branch",
       "source": "github.com/kpenfound/dag/feature-branch",
-      "pin": "d1c42dcd8f29d44370286e259814eb4d687b6970"
+      "pin": "eb8773582a38c5ce1c5b635e75d3eeaccc10b6e9"
     },
     {
       "name": "workspace",
