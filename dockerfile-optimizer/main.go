@@ -24,7 +24,6 @@ import (
 	"dagger/dockerfile-optimizer/internal/dagger"
 
 	"github.com/dustin/go-humanize"
-	"github.com/google/uuid"
 )
 
 type DockerfileOptimizer struct{}
@@ -89,25 +88,22 @@ $extra_context
 
 // Create a new PullRequest with the changes in the workspace, the given title and body, returns the PR URL
 func createPR(ctx context.Context, githubToken *dagger.Secret, repoURL string, w *dagger.Workspace, path, llmAnswer string) (string, error) {
-	// generate a random branch name
-	branchName := "dockerfile-improvements-" + uuid.New().String()[:8]
-	// The changeset needs to contain only the Dockerfile otherwise the diff will fail (FIXME?)
-	changeset := dag.Directory().WithFile(path, w.Workdir().File(path))
 	// Create a new feature branch
-	featureBranch := dag.FeatureBranch(githubToken, repoURL, branchName).
-		WithChanges(changeset)
+	featureBranch := dag.
+		FeatureBranch(githubToken, repoURL, "dockerfile-improvements").
+		WithChanges(w.Workdir())
 
 	// Make sure changes have been made to the workspace
-	diff, err := featureBranch.Diff(ctx)
+	diff, err := featureBranch.Diff(ctx, true)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to get branch diff: %w", err)
 	}
 
 	if diff == "" {
 		return "", fmt.Errorf("got empty diff on feature branch (llm did not make any changes)")
 	}
 
-	return featureBranch.PullRequest(ctx, "Optimizing Dockerfile", llmAnswer)
+	return featureBranch.CreatePullRequestWithLlm(ctx, llmAnswer)
 }
 
 // Optimize a Dockerfile

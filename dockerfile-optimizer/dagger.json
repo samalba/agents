@@ -7,8 +7,7 @@
   "dependencies": [
     {
       "name": "feature-branch",
-      "source": "github.com/kpenfound/dag/feature-branch",
-      "pin": "eb8773582a38c5ce1c5b635e75d3eeaccc10b6e9"
+      "source": "../feature-branch"
     },
     {
       "name": "workspace",
