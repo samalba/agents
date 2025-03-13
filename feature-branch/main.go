@@ -18,6 +18,7 @@ import (
 	"context"
 	"dagger/feature-branch/internal/dagger"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -95,7 +96,7 @@ func (m *FeatureBranch) Push(ctx context.Context) error {
 }
 
 // Opens a Pull Request on GitHub
-func (m *FeatureBranch) CreatePullRequest(ctx context.Context, title string, body string, draft bool) error {
+func (m *FeatureBranch) CreatePullRequest(ctx context.Context, title string, body string, draft bool) (string, error) {
 	prArgs := []string{"gh", "pr", "create"}
 	if title == "" || body == "" {
 		prArgs = append(prArgs, "--fill")
@@ -105,24 +106,30 @@ func (m *FeatureBranch) CreatePullRequest(ctx context.Context, title string, bod
 	if draft {
 		prArgs = append(prArgs, "--draft")
 	}
-	_, err := m.Ctr.WithExec(prArgs).Sync(ctx)
-	return err
+
+	prURL, err := m.Ctr.WithExec(prArgs).Stdout(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	prURL = strings.TrimSpace(prURL)
+	return prURL, nil
 }
 
 // Opens a Pull Request on GitHub, with the help of an LLM
-func (m *FeatureBranch) CreatePullRequestWithLLM(ctx context.Context, additionalContext string, llmOpts ...dagger.LlmOpts) error {
+func (m *FeatureBranch) CreatePullRequestWithLLM(ctx context.Context, additionalContext string) (string, error) {
 	// First create a draft PR with filled title and body
-	err := m.CreatePullRequest(ctx, "", "", true)
+	prURL, err := m.CreatePullRequest(ctx, "", "", true)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// Get the diff of the PR
 	diff, err := m.Ctr.WithExec([]string{"gh", "pr", "diff"}).Stdout(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// Augment the PR with the LLM
-	llm := dag.Llm(llmOpts...).
+	llm := dag.Llm().
 		WithPromptVar("diff", diff).
 		WithPromptVar("additionalContext", additionalContext).
 		WithPrompt(`Generate a detailed description of the changes in the PR.
@@ -142,7 +149,7 @@ func (m *FeatureBranch) CreatePullRequestWithLLM(ctx context.Context, additional
 		`)
 	generatedDescription, err := llm.LastReply(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// Update the PR with the LLM's description
 	_, err = m.Ctr.
@@ -150,5 +157,5 @@ func (m *FeatureBranch) CreatePullRequestWithLLM(ctx context.Context, additional
 		WithExec([]string{"gh", "pr", "edit", "--body-file", "/input/body-file.txt"}).
 		Sync(ctx)
 
-	return err
+	return prURL, nil
 }
