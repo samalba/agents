@@ -24,7 +24,6 @@ import (
 	"dagger/dockerfile-optimizer/internal/dagger"
 
 	"github.com/dustin/go-humanize"
-	"github.com/google/uuid"
 )
 
 type DockerfileOptimizer struct{}
@@ -71,14 +70,17 @@ func askLLM(ws *dagger.Workspace, dockerfile, extraContext string) *dagger.Llm {
 		WithPromptVar("extra_context", extraContext).
 		WithPrompt(`
 You are a Platform Engineer with deep knowledge of Dockerfiles. You have access to a workspace.
-Use the read, write and build tools to complete the following assignment.
+Use the read, write and build tools to complete the following assignment:
 
-- Build the Dockerfile in the provided workspace at the path: "$dockerfile"
-- Optimize the Dockerfile for reducing its size, number of layers, and build time. And if possible, increasing the security level of the image by implementing best practices.
+Assignment: Optimize the Dockerfile for reducing its size, number of layers, and build time. And if possible, increasing the security level of the image by implementing best practices.
+
+While making the optimizations, follow these guidelines:
+- Make all the optimizations you can think of at once, don't try to optimize it step by step.
 - Make sure to never downgrade any image version found in the Dockerfile.
 - If the Dockerfile is already optimized, just return an explanation that you couldn't optimize it.
-- Make sure the Dockerfile builds correctly before going to the next step.
+- Before writing the new Dockerfile to the workspace, make sure the Dockerfile builds correctly.
 - If you have changes to make, write the optimized Dockerfile to the workspace, at the same path "$dockerfile".
+- Skip explanations of intermediate steps before the final answer.
 
 At the end, return an explanation of the changes you made to the Dockerfile.
 $extra_context
@@ -87,46 +89,21 @@ $extra_context
 	return llm
 }
 
-// Create a new PullRequest with the changes in the workspace, the given title and body, returns the PR URL
-func createPR(ctx context.Context, githubToken *dagger.Secret, repoURL string, w *dagger.Workspace, path, llmAnswer string) (string, error) {
-	// generate a random branch name
-	branchName := "dockerfile-improvements-" + uuid.New().String()[:8]
-	// The changeset needs to contain only the Dockerfile otherwise the diff will fail (FIXME?)
-	changeset := dag.Directory().WithFile(path, w.Workdir().File(path))
-	// Create a new feature branch
-	featureBranch := dag.FeatureBranch(githubToken, repoURL, branchName).
-		WithChanges(changeset)
-
-	// Make sure changes have been made to the workspace
-	diff, err := featureBranch.Diff(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	if diff == "" {
-		return "", fmt.Errorf("got empty diff on feature branch (llm did not make any changes)")
-	}
-
-	return featureBranch.PullRequest(ctx, "Optimizing Dockerfile", llmAnswer)
-}
-
-// Optimize a Dockerfile
-func (m *DockerfileOptimizer) OptimizeDockerfile(ctx context.Context, githubToken *dagger.Secret, repoURL string) (string, error) {
-	repoURL = strings.TrimSuffix(repoURL, ".git")
-
+// Optimize a Dockerfile from a directory
+func (m *DockerfileOptimizer) optimizeDockerfileFromDirectory(ctx context.Context, src *dagger.Directory) (*dagger.Directory, []string, string, error) {
 	// Create a new workspace, using third-party module
-	ws := dag.Workspace(githubToken, repoURL)
+	ws := dag.Workspace(src)
 	originalWorkdir := ws.Workdir()
 
 	// Find the Dockerfile
 	// FIXME: handle multiple Dockerfiles
 	dockerfiles, err := ws.Workdir().Glob(ctx, "*Dockerfile*")
 	if err != nil {
-		return "", fmt.Errorf("cannot read the directory: %w", err)
+		return nil, nil, "", fmt.Errorf("cannot read the directory: %w", err)
 	}
 
 	if len(dockerfiles) == 0 {
-		return "", fmt.Errorf("no Dockerfile found")
+		return nil, nil, "", fmt.Errorf("no Dockerfile found")
 	}
 
 	dockerfile := dockerfiles[0]
@@ -134,7 +111,7 @@ func (m *DockerfileOptimizer) OptimizeDockerfile(ctx context.Context, githubToke
 	// Get the image info
 	originalImgInfo, err := imageInfo(ctx, ws.Workdir(), dockerfile)
 	if err != nil {
-		return "", fmt.Errorf("failed to get image info: %w", err)
+		return nil, nil, "", fmt.Errorf("failed to get image info: %w", err)
 	}
 
 	extraContext := ""
@@ -147,7 +124,7 @@ func (m *DockerfileOptimizer) OptimizeDockerfile(ctx context.Context, githubToke
 		llm := askLLM(ws, dockerfile, extraContext)
 		answer, err = llm.LastReply(ctx)
 		if err != nil {
-			return "", fmt.Errorf("failed to ask LLM: %w", err)
+			return nil, nil, "", fmt.Errorf("failed to ask LLM: %w", err)
 		}
 
 		lastState = llm.Workspace()
@@ -155,7 +132,7 @@ func (m *DockerfileOptimizer) OptimizeDockerfile(ctx context.Context, githubToke
 		// Compare the optimized Dockerfile with the original one
 		lastImgInfo, err = imageInfo(ctx, lastState.Workdir(), dockerfile)
 		if err != nil {
-			return "", fmt.Errorf("failed to get image info: %w", err)
+			return nil, nil, "", fmt.Errorf("failed to get image info: %w", err)
 		}
 
 		// We consider the optimization satisfactory if the size of the image is smaller
@@ -174,16 +151,62 @@ func (m *DockerfileOptimizer) OptimizeDockerfile(ctx context.Context, githubToke
 	// Check if the workspace has been modified
 	diff, err := originalWorkdir.Diff(lastState.Workdir()).Entries(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to get workspace diff: %w", err)
+		return nil, nil, "", fmt.Errorf("failed to get workspace diff: %w", err)
 	}
 
 	if len(diff) == 0 {
-		return answer, fmt.Errorf("failed to optimize the Dockerfile")
+		return nil, nil, "", fmt.Errorf("failed to optimize the Dockerfile")
 	}
 
 	answer += "\n\nImage info:\n"
 	answer += fmt.Sprintf("- The original image has %d layers and is %s in size.\n", originalImgInfo[0], humanize.Bytes(uint64(originalImgInfo[1])))
 	answer += fmt.Sprintf("- The optimized image has %d layers and is %s in size.\n", lastImgInfo[0], humanize.Bytes(uint64(lastImgInfo[1])))
 
-	return createPR(ctx, githubToken, repoURL, lastState, dockerfile, answer)
+	return lastState.Workdir(), diff, answer, nil
+}
+
+// Create a new PullRequest with the changes in the workspace, the given title and body, returns the PR URL
+func createPR(ctx context.Context, githubToken *dagger.Secret, repoURL string, src *dagger.Directory, llmAnswer string) (string, error) {
+	// Create a new feature branch
+	featureBranch := dag.
+		FeatureBranch(githubToken, repoURL, "dockerfile-improvements").
+		WithChanges(src).
+		Commit("Optimize Dockerfile").
+		Push()
+
+	// Make sure changes have been made to the workspace
+	diff, err := featureBranch.Diff(ctx, true)
+	if err != nil {
+		return "", fmt.Errorf("failed to get branch diff: %w", err)
+	}
+
+	if diff == "" {
+		return "", fmt.Errorf("got empty diff on feature branch (llm did not make any changes)")
+	}
+
+	return featureBranch.CreatePullRequestWithLlm(ctx, llmAnswer)
+}
+
+// Optimize a Dockerfile from a remote Github repository, and open a PR with the changes
+func (m *DockerfileOptimizer) OptimizeDockerfileFromGithub(ctx context.Context, githubToken *dagger.Secret, repoURL string) (string, error) {
+	if !strings.HasSuffix(repoURL, ".git") {
+		repoURL = repoURL + ".git"
+	}
+
+	output, _, answer, err := m.optimizeDockerfileFromDirectory(ctx, dag.Git(repoURL).Head().Tree())
+	if err != nil {
+		return "", fmt.Errorf("failed to optimize the Dockerfile: %w", err)
+	}
+
+	return createPR(ctx, githubToken, repoURL, output, answer)
+}
+
+// Optimize a Dockerfile from a directory, only returns the initial directory with the optimized Dockerfile
+func (m *DockerfileOptimizer) OptimizeDockerfileFromDirectory(ctx context.Context, src *dagger.Directory) (*dagger.Directory, error) {
+	output, _, _, err := m.optimizeDockerfileFromDirectory(ctx, src)
+	if err != nil {
+		return nil, fmt.Errorf("failed to optimize the Dockerfile: %w", err)
+	}
+
+	return output, nil
 }

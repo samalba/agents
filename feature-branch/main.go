@@ -18,6 +18,7 @@ import (
 	"context"
 	"dagger/feature-branch/internal/dagger"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -33,12 +34,16 @@ type FeatureBranch struct {
 
 // Initialize a new feature branch
 func New(ctx context.Context, githubToken *dagger.Secret, repoURL string, branchPrefix string) *FeatureBranch {
+	repoURL = strings.TrimSuffix(repoURL, ".git")
+
 	return &FeatureBranch{
 		Ctr: dag.Container().
 			From("cgr.dev/chainguard/wolfi-base:latest").
 			WithExec([]string{"apk", "add", "git", "gh", "rsync"}).
-			WithMountedSecret("/secrets/github-token", githubToken).
-			WithExec([]string{"gh", "auth", "login", "--with-token", "/secrets/github-token"}).
+			WithSecretVariable("GITHUB_TOKEN", githubToken).
+			WithExec([]string{"git", "config", "--global", "user.email", "sam+module-feature-branch@dagger.io"}).
+			WithExec([]string{"git", "config", "--global", "user.name", "Dagger Agent"}).
+			WithExec([]string{"gh", "auth", "setup-git"}).
 			WithExec([]string{"gh", "repo", "clone", repoURL, "/src"}).
 			WithWorkdir("/src"),
 		BranchName: branchPrefix + "-" + uuid.New().String()[:8],
@@ -54,7 +59,7 @@ func (m *FeatureBranch) WithChanges(changes *dagger.Directory) *FeatureBranch {
 func applyChanges(ctx context.Context, baseImage *dagger.Container, changes *dagger.Directory) *dagger.Container {
 	return baseImage.
 		WithMountedDirectory("/changes", changes).
-		WithExec([]string{"rsync", "-a", "/changes", "/src"})
+		WithExec([]string{"rsync", "-a", "/changes/", "/src"})
 }
 
 // Diff the changeset of the feature branch
@@ -74,9 +79,9 @@ func (m *FeatureBranch) Diff(ctx context.Context, namesOnly bool) (string, error
 }
 
 // Commit the changes
-func (m *FeatureBranch) Commit(ctx context.Context, message string) error {
+func (m *FeatureBranch) Commit(ctx context.Context, message string) (*FeatureBranch, error) {
 	if m.Changes == nil {
-		return errors.New("no changes to commit")
+		return nil, errors.New("no changes to commit")
 	}
 
 	m.Ctr = applyChanges(ctx, m.Ctr, m.Changes).
@@ -85,18 +90,18 @@ func (m *FeatureBranch) Commit(ctx context.Context, message string) error {
 		WithExec([]string{"git", "commit", "-m", message})
 
 	_, err := m.Ctr.Sync(ctx)
-	return err
+	return m, err
 }
 
 // Push the changes to the remote branch
-func (m *FeatureBranch) Push(ctx context.Context) error {
+func (m *FeatureBranch) Push(ctx context.Context) (*FeatureBranch, error) {
 	_, err := m.Ctr.WithExec([]string{"git", "push", "origin", m.BranchName}).Sync(ctx)
-	return err
+	return m, err
 }
 
 // Opens a Pull Request on GitHub
-func (m *FeatureBranch) CreatePullRequest(ctx context.Context, title string, body string, draft bool) error {
-	prArgs := []string{"gh", "pr", "create"}
+func (m *FeatureBranch) CreatePullRequest(ctx context.Context, title string, body string, draft bool) (string, error) {
+	prArgs := []string{"gh", "pr", "create", "--head", m.BranchName}
 	if title == "" || body == "" {
 		prArgs = append(prArgs, "--fill")
 	} else {
@@ -105,24 +110,32 @@ func (m *FeatureBranch) CreatePullRequest(ctx context.Context, title string, bod
 	if draft {
 		prArgs = append(prArgs, "--draft")
 	}
-	_, err := m.Ctr.WithExec(prArgs).Sync(ctx)
-	return err
+
+	out, err := m.Ctr.WithExec(prArgs).Stdout(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// Grab the last line of the output, which is the PR URL
+	lines := strings.Split(out, "\n")
+	prURL := strings.TrimSpace(lines[len(lines)-1])
+	return prURL, nil
 }
 
 // Opens a Pull Request on GitHub, with the help of an LLM
-func (m *FeatureBranch) CreatePullRequestWithLLM(ctx context.Context, additionalContext string, llmOpts ...dagger.LlmOpts) error {
+func (m *FeatureBranch) CreatePullRequestWithLLM(ctx context.Context, additionalContext string) (string, error) {
 	// First create a draft PR with filled title and body
-	err := m.CreatePullRequest(ctx, "", "", true)
+	prURL, err := m.CreatePullRequest(ctx, "", "", true)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// Get the diff of the PR
 	diff, err := m.Ctr.WithExec([]string{"gh", "pr", "diff"}).Stdout(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// Augment the PR with the LLM
-	llm := dag.Llm(llmOpts...).
+	llm := dag.Llm().
 		WithPromptVar("diff", diff).
 		WithPromptVar("additionalContext", additionalContext).
 		WithPrompt(`Generate a detailed description of the changes in the PR.
@@ -142,7 +155,7 @@ func (m *FeatureBranch) CreatePullRequestWithLLM(ctx context.Context, additional
 		`)
 	generatedDescription, err := llm.LastReply(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// Update the PR with the LLM's description
 	_, err = m.Ctr.
@@ -150,5 +163,5 @@ func (m *FeatureBranch) CreatePullRequestWithLLM(ctx context.Context, additional
 		WithExec([]string{"gh", "pr", "edit", "--body-file", "/input/body-file.txt"}).
 		Sync(ctx)
 
-	return err
+	return prURL, nil
 }
