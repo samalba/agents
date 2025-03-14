@@ -17,7 +17,6 @@ package main
 import (
 	"context"
 	"path/filepath"
-	"strings"
 
 	"dagger/workspace/internal/dagger"
 )
@@ -26,27 +25,11 @@ type Workspace struct {
 	// The workspace's directory state
 	// +internal-use-only
 	Workdir *dagger.Directory
-	// Repository URL
-	// +internal-use-only
-	RepoURL string
-	// GitHub token
-	// +internal-use-only
-	GitHubToken *dagger.Secret
 }
 
-func New(githubToken *dagger.Secret, repoURL string) Workspace {
-	if !strings.HasSuffix(repoURL, ".git") {
-		repoURL = repoURL + ".git"
-	}
-
-	// Clone the repository
-	repo := dag.Git(repoURL).Head().Tree()
-
+func New(workdir *dagger.Directory) Workspace {
 	return Workspace{
-		// Build a base container optimized for Go development
-		Workdir:     repo,
-		RepoURL:     repoURL,
-		GitHubToken: githubToken,
+		Workdir: workdir,
 	}
 }
 

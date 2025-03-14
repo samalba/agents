@@ -34,6 +34,8 @@ type FeatureBranch struct {
 
 // Initialize a new feature branch
 func New(ctx context.Context, githubToken *dagger.Secret, repoURL string, branchPrefix string) *FeatureBranch {
+	repoURL = strings.TrimSuffix(repoURL, ".git")
+
 	return &FeatureBranch{
 		Ctr: dag.Container().
 			From("cgr.dev/chainguard/wolfi-base:latest").
