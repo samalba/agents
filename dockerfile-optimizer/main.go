@@ -70,13 +70,15 @@ func askLLM(ws *dagger.Workspace, dockerfile, extraContext string) *dagger.Llm {
 		WithPromptVar("extra_context", extraContext).
 		WithPrompt(`
 You are a Platform Engineer with deep knowledge of Dockerfiles. You have access to a workspace.
-Use the read, write and build tools to complete the following assignment.
+Use the read, write and build tools to complete the following assignment:
 
-- Build the Dockerfile in the provided workspace at the path: "$dockerfile"
-- Optimize the Dockerfile for reducing its size, number of layers, and build time. And if possible, increasing the security level of the image by implementing best practices.
+Assignment: Optimize the Dockerfile for reducing its size, number of layers, and build time. And if possible, increasing the security level of the image by implementing best practices.
+
+While making the optimizations, follow these guidelines:
+- Make all the optimizations you can think of at once, don't try to optimize it step by step.
 - Make sure to never downgrade any image version found in the Dockerfile.
 - If the Dockerfile is already optimized, just return an explanation that you couldn't optimize it.
-- Make sure the Dockerfile builds correctly before going to the next step.
+- Before writing the new Dockerfile to the workspace, make sure the Dockerfile builds correctly.
 - If you have changes to make, write the optimized Dockerfile to the workspace, at the same path "$dockerfile".
 
 At the end, return an explanation of the changes you made to the Dockerfile.
@@ -87,11 +89,13 @@ $extra_context
 }
 
 // Create a new PullRequest with the changes in the workspace, the given title and body, returns the PR URL
-func createPR(ctx context.Context, githubToken *dagger.Secret, repoURL string, w *dagger.Workspace, path, llmAnswer string) (string, error) {
+func createPR(ctx context.Context, githubToken *dagger.Secret, repoURL string, w *dagger.Workspace, llmAnswer string) (string, error) {
 	// Create a new feature branch
 	featureBranch := dag.
 		FeatureBranch(githubToken, repoURL, "dockerfile-improvements").
-		WithChanges(w.Workdir())
+		WithChanges(w.Workdir()).
+		Commit("Optimize Dockerfile").
+		Push()
 
 	// Make sure changes have been made to the workspace
 	diff, err := featureBranch.Diff(ctx, true)
@@ -181,5 +185,5 @@ func (m *DockerfileOptimizer) OptimizeDockerfile(ctx context.Context, githubToke
 	answer += fmt.Sprintf("- The original image has %d layers and is %s in size.\n", originalImgInfo[0], humanize.Bytes(uint64(originalImgInfo[1])))
 	answer += fmt.Sprintf("- The optimized image has %d layers and is %s in size.\n", lastImgInfo[0], humanize.Bytes(uint64(lastImgInfo[1])))
 
-	return createPR(ctx, githubToken, repoURL, lastState, dockerfile, answer)
+	return createPR(ctx, githubToken, repoURL, lastState, answer)
 }
