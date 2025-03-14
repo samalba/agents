@@ -72,14 +72,13 @@ func askLLM(ws *dagger.Workspace, dockerfile, extraContext string) *dagger.Llm {
 You are a Platform Engineer with deep knowledge of Dockerfiles. You have access to a workspace.
 Use the read, write and build tools to complete the following assignment:
 
-Assignment: Optimize the Dockerfile for reducing its size, number of layers, and build time. And if possible, increasing the security level of the image by implementing best practices.
+Assignment: Optimize the Dockerfile for reducing its size, number of layers, and build time. And when possible, increasing the security level of the image by implementing best practices.
 
-While making the optimizations, follow these guidelines:
+Follow these guidelines:
 - Make all the optimizations you can think of at once, don't try to optimize it step by step.
 - Make sure to never downgrade any image version found in the Dockerfile.
 - If the Dockerfile is already optimized, just return an explanation that you couldn't optimize it.
-- Before writing the new Dockerfile to the workspace, make sure the Dockerfile builds correctly.
-- If you have changes to make, write the optimized Dockerfile to the workspace, at the same path "$dockerfile".
+- Make sure the new Dockerfile builds correctly and write it to the workspace, replacing the old one.
 - Skip explanations of intermediate steps before the final answer.
 
 At the end, return an explanation of the changes you made to the Dockerfile.

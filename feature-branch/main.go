@@ -117,7 +117,7 @@ func (m *FeatureBranch) CreatePullRequest(ctx context.Context, title string, bod
 	}
 
 	// Grab the last line of the output, which is the PR URL
-	lines := strings.Split(out, "\n")
+	lines := strings.Split(strings.TrimSpace(out), "\n")
 	prURL := strings.TrimSpace(lines[len(lines)-1])
 	return prURL, nil
 }
@@ -139,20 +139,20 @@ func (m *FeatureBranch) CreatePullRequestWithLLM(ctx context.Context, additional
 		WithPromptVar("diff", diff).
 		WithPromptVar("additionalContext", additionalContext).
 		WithPrompt(`Generate a detailed description of the changes in the PR.
-		Include the following information:
-		- The changes made to the code
-		- The rationale for the changes
-		- Any potential risks or considerations
-		- Any other relevant details
+Include the following information:
+- The changes made to the code
+- The rationale for the changes
+- Any potential risks or considerations
+- Any other relevant details
 
-		Take into account the following additional context:
-		$additionalContext
+Take into account the following additional context:
+$additionalContext
 
-		And take into account the following diff, this is the output of the git diff command:
-		$diff
+And take into account the following diff, this is the output of the git diff command:
+$diff
 
-		Only output the description, nothing else.
-		`)
+Only output the description, nothing else.
+`)
 	generatedDescription, err := llm.LastReply(ctx)
 	if err != nil {
 		return "", err
@@ -161,7 +161,8 @@ func (m *FeatureBranch) CreatePullRequestWithLLM(ctx context.Context, additional
 	_, err = m.Ctr.
 		WithMountedDirectory("/input", dag.Directory().WithNewFile("body-file.txt", generatedDescription)).
 		WithExec([]string{"gh", "pr", "edit", "--body-file", "/input/body-file.txt"}).
+		WithExec([]string{"gh", "pr", "ready"}).
 		Sync(ctx)
 
-	return prURL, nil
+	return prURL, err
 }
