@@ -89,7 +89,7 @@ $extra_context
 }
 
 // Optimize a Dockerfile from a directory
-func (m *DockerfileOptimizer) optimizeDockerfileFromDirectory(ctx context.Context, src *dagger.Directory) (*dagger.Directory, []string, string, error) {
+func (m *DockerfileOptimizer) optimizeDockerfile(ctx context.Context, src *dagger.Directory) (*dagger.Directory, []string, string, error) {
 	// Create a new workspace, using third-party module
 	ws := dag.Workspace(src)
 	originalWorkdir := ws.Workdir()
@@ -192,7 +192,7 @@ func (m *DockerfileOptimizer) OptimizeDockerfileFromGithub(ctx context.Context, 
 		repoURL = repoURL + ".git"
 	}
 
-	output, _, answer, err := m.optimizeDockerfileFromDirectory(ctx, dag.Git(repoURL).Head().Tree())
+	output, _, answer, err := m.optimizeDockerfile(ctx, dag.Git(repoURL).Head().Tree())
 	if err != nil {
 		return "", fmt.Errorf("failed to optimize the Dockerfile: %w", err)
 	}
@@ -202,7 +202,7 @@ func (m *DockerfileOptimizer) OptimizeDockerfileFromGithub(ctx context.Context, 
 
 // Optimize a Dockerfile from a directory, only returns the initial directory with the optimized Dockerfile
 func (m *DockerfileOptimizer) OptimizeDockerfileFromDirectory(ctx context.Context, src *dagger.Directory) (*dagger.Directory, error) {
-	output, _, _, err := m.optimizeDockerfileFromDirectory(ctx, src)
+	output, _, _, err := m.optimizeDockerfile(ctx, src)
 	if err != nil {
 		return nil, fmt.Errorf("failed to optimize the Dockerfile: %w", err)
 	}
