@@ -63,7 +63,7 @@ func imageInfo(ctx context.Context, dir *dagger.Directory, path string) ([]int, 
 	return []int{numLayers, int(imgInfo.Image.SizeBytes)}, nil
 }
 
-func askLLM(ws *dagger.Workspace, dockerfile, extraContext string) *dagger.Llm {
+func askLLM(ws *dagger.Workspace, dockerfile, extraContext string) *dagger.LLM {
 	llm := dag.Llm().
 		WithWorkspace(ws).
 		WithPromptVar("dockerfile", dockerfile).
