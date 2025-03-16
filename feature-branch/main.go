@@ -33,7 +33,7 @@ type FeatureBranch struct {
 }
 
 // Initialize a new feature branch
-func New(ctx context.Context, githubToken *dagger.Secret, repoURL string, branchPrefix string) *FeatureBranch {
+func New(ctx context.Context, githubToken *dagger.Secret, repoURL string, branchName string) *FeatureBranch {
 	repoURL = strings.TrimSuffix(repoURL, ".git")
 
 	return &FeatureBranch{
@@ -46,8 +46,14 @@ func New(ctx context.Context, githubToken *dagger.Secret, repoURL string, branch
 			WithExec([]string{"gh", "auth", "setup-git"}).
 			WithExec([]string{"gh", "repo", "clone", repoURL, "/src"}).
 			WithWorkdir("/src"),
-		BranchName: branchPrefix + "-" + uuid.New().String()[:8],
+		BranchName: branchName,
 	}
+}
+
+// Set the branch name to a new unique name
+func (m *FeatureBranch) WithNewUniqueBranchName() *FeatureBranch {
+	m.BranchName = m.BranchName + "-" + uuid.New().String()[:8]
+	return m
 }
 
 // Set changeset of the feature branch

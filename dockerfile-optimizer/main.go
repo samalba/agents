@@ -169,6 +169,7 @@ func createPR(ctx context.Context, githubToken *dagger.Secret, repoURL string, s
 	// Create a new feature branch
 	featureBranch := dag.
 		FeatureBranch(githubToken, repoURL, "dockerfile-improvements").
+		WithNewUniqueBranchName().
 		WithChanges(src).
 		Commit("Optimize Dockerfile").
 		Push()
