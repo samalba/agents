@@ -166,3 +166,17 @@ Only output the description, nothing else.
 
 	return prURL, err
 }
+
+// Get the body of a Pull Request
+// Query is any argument supported by the gh cli (gh pr view [<number> | <url> | <branch>]).
+func (m *FeatureBranch) GetPullRequestBody(ctx context.Context, query string) (string, error) {
+	body, err := m.Ctr.
+		WithExec([]string{"gh", "pr", "view", "--json", "body", "--jq", ".body", query}).
+		Stdout(ctx)
+
+	if err != nil {
+		return "", err
+	}
+
+	return body, nil
+}
