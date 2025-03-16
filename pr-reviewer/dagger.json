@@ -1,0 +1,13 @@
+{
+  "name": "pr-reviewer",
+  "engineVersion": "v0.17.0-llm.8",
+  "sdk": {
+    "source": "go"
+  },
+  "dependencies": [
+    {
+      "name": "feature-branch",
+      "source": "../feature-branch"
+    }
+  ]
+}

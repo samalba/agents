@@ -173,11 +173,19 @@ Only output the description, nothing else.
 	return prURL, err
 }
 
+// Checkout a Pull Request code
+// Query is any argument supported by the gh cli (gh pr checkout [<number> | <url> | <branch>])
+func (m *FeatureBranch) CheckoutPullRequest(ctx context.Context, query string) (*FeatureBranch, error) {
+	m.Ctr = m.Ctr.
+		WithExec([]string{"gh", "pr", "checkout", query})
+
+	return m, nil
+}
+
 // Get the body of a Pull Request
-// Query is any argument supported by the gh cli (gh pr view [<number> | <url> | <branch>]).
-func (m *FeatureBranch) GetPullRequestBody(ctx context.Context, query string) (string, error) {
+func (m *FeatureBranch) GetPullRequestBody(ctx context.Context) (string, error) {
 	body, err := m.Ctr.
-		WithExec([]string{"gh", "pr", "view", "--json", "body", "--jq", ".body", query}).
+		WithExec([]string{"gh", "pr", "view", "--json", "body", "--jq", ".body"}).
 		Stdout(ctx)
 
 	if err != nil {
@@ -185,4 +193,14 @@ func (m *FeatureBranch) GetPullRequestBody(ctx context.Context, query string) (s
 	}
 
 	return body, nil
+}
+
+// Get the diff of a Pull Request
+func (m *FeatureBranch) GetPullRequestDiff(ctx context.Context, query string) (string, error) {
+	diff, err := m.Ctr.WithExec([]string{"gh", "pr", "diff"}).Stdout(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return diff, nil
 }
