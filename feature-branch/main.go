@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"dagger/feature-branch/internal/dagger"
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -182,17 +183,26 @@ func (m *FeatureBranch) CheckoutPullRequest(ctx context.Context, query string) (
 	return m, nil
 }
 
-// Get the body of a Pull Request
-func (m *FeatureBranch) GetPullRequestBody(ctx context.Context) (string, error) {
-	body, err := m.Ctr.
-		WithExec([]string{"gh", "pr", "view", "--json", "body", "--jq", ".body"}).
+// Get the body of a Pull Request, returns title, body in a slice
+func (m *FeatureBranch) GetPullRequestBodyTitle(ctx context.Context) ([]string, error) {
+	data, err := m.Ctr.
+		WithExec([]string{"gh", "pr", "view", "--json", "body", "--json", "title"}).
 		Stdout(ctx)
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return body, nil
+	var body struct {
+		Body  string `json:"body"`
+		Title string `json:"title"`
+	}
+
+	if err := json.Unmarshal([]byte(data), &body); err != nil {
+		return nil, err
+	}
+
+	return []string{body.Title, body.Body}, nil
 }
 
 // Get the diff of a Pull Request
@@ -203,4 +213,14 @@ func (m *FeatureBranch) GetPullRequestDiff(ctx context.Context, query string) (s
 	}
 
 	return diff, nil
+}
+
+// Add a comment on the PullRequest, set editLast to true to edit the last comment
+func (m *FeatureBranch) AddPullRequestComment(ctx context.Context, comment string, editLast bool) (string, error) {
+	ghArgs := []string{"gh", "pr", "comment", "--body", comment}
+	if editLast {
+		ghArgs = append(ghArgs, "--edit-last")
+	}
+	out, err := m.Ctr.WithExec(ghArgs).Stdout(ctx)
+	return out, err
 }
