@@ -1,5 +1,5 @@
 {
-  "name": "dockerfile-optimizer",
+  "name": "pr-reviewer",
   "engineVersion": "v0.17.0-llm.11",
   "sdk": {
     "source": "go"
@@ -8,10 +8,6 @@
     {
       "name": "feature-branch",
       "source": "../feature-branch"
-    },
-    {
-      "name": "workspace",
-      "source": "workspace"
     }
   ]
 }

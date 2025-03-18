@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"dagger/feature-branch/internal/dagger"
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -33,7 +34,7 @@ type FeatureBranch struct {
 }
 
 // Initialize a new feature branch
-func New(ctx context.Context, githubToken *dagger.Secret, repoURL string, branchPrefix string) *FeatureBranch {
+func New(ctx context.Context, githubToken *dagger.Secret, repoURL string, branchName string) *FeatureBranch {
 	repoURL = strings.TrimSuffix(repoURL, ".git")
 
 	return &FeatureBranch{
@@ -46,8 +47,14 @@ func New(ctx context.Context, githubToken *dagger.Secret, repoURL string, branch
 			WithExec([]string{"gh", "auth", "setup-git"}).
 			WithExec([]string{"gh", "repo", "clone", repoURL, "/src"}).
 			WithWorkdir("/src"),
-		BranchName: branchPrefix + "-" + uuid.New().String()[:8],
+		BranchName: branchName,
 	}
+}
+
+// Set the branch name to a new unique name
+func (m *FeatureBranch) WithNewUniqueBranchName() *FeatureBranch {
+	m.BranchName = m.BranchName + "-" + uuid.New().String()[:8]
+	return m
 }
 
 // Set changeset of the feature branch
@@ -165,4 +172,55 @@ Only output the description, nothing else.
 		Sync(ctx)
 
 	return prURL, err
+}
+
+// Checkout a Pull Request code
+// Query is any argument supported by the gh cli (gh pr checkout [<number> | <url> | <branch>])
+func (m *FeatureBranch) CheckoutPullRequest(ctx context.Context, query string) (*FeatureBranch, error) {
+	m.Ctr = m.Ctr.
+		WithExec([]string{"gh", "pr", "checkout", query})
+
+	return m, nil
+}
+
+// Get the body of a Pull Request, returns title, body in a slice
+func (m *FeatureBranch) GetPullRequestBodyTitle(ctx context.Context) ([]string, error) {
+	data, err := m.Ctr.
+		WithExec([]string{"gh", "pr", "view", "--json", "body", "--json", "title"}).
+		Stdout(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var body struct {
+		Body  string `json:"body"`
+		Title string `json:"title"`
+	}
+
+	if err := json.Unmarshal([]byte(data), &body); err != nil {
+		return nil, err
+	}
+
+	return []string{body.Title, body.Body}, nil
+}
+
+// Get the diff of a Pull Request
+func (m *FeatureBranch) GetPullRequestDiff(ctx context.Context, query string) (string, error) {
+	diff, err := m.Ctr.WithExec([]string{"gh", "pr", "diff"}).Stdout(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return diff, nil
+}
+
+// Add a comment on the PullRequest, set editLast to true to edit the last comment
+func (m *FeatureBranch) AddPullRequestComment(ctx context.Context, comment string, editLast bool) (string, error) {
+	ghArgs := []string{"gh", "pr", "comment", "--body", comment}
+	if editLast {
+		ghArgs = append(ghArgs, "--edit-last")
+	}
+	out, err := m.Ctr.WithExec(ghArgs).Stdout(ctx)
+	return out, err
 }
