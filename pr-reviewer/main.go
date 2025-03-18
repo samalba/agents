@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"dagger/pr-reviewer/internal/dagger"
+	"fmt"
 )
 
 type PrReviewer struct{}
@@ -24,20 +25,72 @@ type PrReviewer struct{}
 // Review a PR, by default it will review the PR description and the diff.
 // Query is any argument supported by the gh cli (gh pr view [<number> | <url> | <branch>]).
 // Additional instructions can be provided to the LLM to guide the review.
-func (m *PrReviewer) ReviewPr(ctx context.Context, githubToken *dagger.Secret, repoURL string, query, additionalInstructions string) ([]string, error) {
-	prCheckout := dag.FeatureBranch(githubToken, repoURL, "unused-branch-name").CheckoutPullRequest(query)
+// Returns the URL of the PR comment created by the LLM
+func (m *PrReviewer) ReviewPr(ctx context.Context, githubToken *dagger.Secret, query, repoURL,
+	// +optional
+	additionalInstructions string,
+) (string, error) {
+	prCheckout := dag.FeatureBranch(githubToken, repoURL, "unused-branch-name").
+		CheckoutPullRequest(query)
 
-	prBody, err := prCheckout.GetPullRequestBody(ctx)
+	prInfo, err := prCheckout.GetPullRequestBodyTitle(ctx)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
+
+	prTitle := prInfo[0]
+	prBody := prInfo[1]
 
 	prDiff, err := prCheckout.GetPullRequestDiff(ctx, query)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	// TODO: ask LLM
+	if additionalInstructions == "" {
+		additionalInstructions = fmt.Sprintf("\n\nAdditional Instructions: %s\n", additionalInstructions)
+	}
 
-	return nil, nil
+	llm := dag.Llm().
+		WithPromptVar("prTitle", prTitle).
+		WithPromptVar("prBody", prBody).
+		WithPromptVar("prDiff", prDiff).
+		WithPromptVar("additionalInstructions", additionalInstructions).
+		WithPrompt(`Review the following Pull Request:
+
+PR Title:
+$prTitle
+
+PR Body:
+$prBody
+
+PR Diff:
+$prDiff
+$additionalInstructions
+
+Generate a review of the Pull Request. Include the following information:
+- The changes made to the code
+- The rationale for the changes
+- Any potential risks or considerations
+- Any other relevant details
+
+In the review, make a recommendation for merging the PR or requesting changes,
+but do not repeat the PR title or body, or summarizing the changes, focus on the
+merge recommendation and assessment of the changes.
+
+At the very end of the message, mentions if you recommends merging the PR or requesting changes, in bold, with a corresponding emoji.
+
+Only output the review, nothing else.`)
+
+	review, err := llm.LastReply(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// Add the review as a comment
+	url, err := prCheckout.AddPullRequestComment(ctx, review, true)
+	if err != nil {
+		return "", err
+	}
+
+	return url, nil
 }
