@@ -87,7 +87,7 @@ Only output the review, nothing else.`)
 	}
 
 	// Add the review as a comment
-	url, err := prCheckout.AddPullRequestComment(ctx, review, true)
+	url, err := prCheckout.AddPullRequestComment(ctx, review, false)
 	if err != nil {
 		return "", err
 	}

@@ -65,7 +65,7 @@ func imageInfo(ctx context.Context, dir *dagger.Directory, path string) ([]int, 
 
 func askLLM(ws *dagger.Workspace, dockerfile, extraContext string) *dagger.LLM {
 	llm := dag.Llm().
-		WithWorkspace(ws).
+		SetWorkspace("workspace", ws).
 		WithPromptVar("dockerfile", dockerfile).
 		WithPromptVar("extra_context", extraContext).
 		WithPrompt(`
