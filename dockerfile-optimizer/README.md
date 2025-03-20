@@ -1,31 +1,28 @@
-# Dockerfile Optimizer
+# Dockerfile Optimizer 🤖
 
-A Dagger module that helps optimize your Dockerfiles using AI assistance. This tool analyzes your Dockerfile and suggests improvements for better efficiency, security, and best practices. Once the analysis is complete, it automatically creates a pull request with the suggested optimizations.
+## What is this?
 
-This project serves as an example implementation of a simple AI agent using Dagger, demonstrating how to integrate OpenAI's capabilities with GitHub automation in a containerized environment.
+A Dagger module for optimizing Dockerfiles using AI assistance. This tool analyzes your Dockerfile and suggests improvements for better efficiency, security, and best practices. Once the analysis is complete, it automatically creates a pull request with the suggested optimizations.
 
-## Prerequisites
+## How to use it?
 
-Before using this module, make sure you have the following:
+Prerequisites:
 
 1. OpenAI API Token
 2. GitHub Token (for repository access)
 
-## Environment Setup
+*Note: the Github token can be generated from https://github.com/settings/personal-access-tokens*
 
-Set up the required environment variables:
+Start a dev Dagger Engine with LLM support using: https://docs.dagger.io/ai-agents#initial-setup
 
-```bash
+Run an optimization from the Dagger Shell:
+
+```shell
 export OPENAI_API_KEY="your-openai-api-key"
 export GITHUB_TOKEN="your-github-token"
-```
-
-## Usage
-
-To use the Dockerfile optimizer, you can analyze Dockerfiles directly from GitHub repositories:
-
-```bash
-dagger shell -c "optimize-dockerfile $GITHUB_TOKEN https://github.com/username/repository"
+dagger shell -c "optimize-dockerfile GITHUB_TOKEN <REPO_URL>"
+# Example:
+dagger shell -c "optimize-dockerfile GITHUB_TOKEN https://github.com/samalba/demo-app"
 ```
 
 The module will:
@@ -36,17 +33,6 @@ The module will:
 5. Create a new pull request with the improvements
 6. Return the URL of the created pull request
 
-## Example
+## Bonus point
 
-```bash
-# Example: Optimizing a Dockerfile from a GitHub repository
-dagger shell -c "optimize-dockerfile $GITHUB_TOKEN https://github.com/samalba/demo-app"
-```
-
-The tool will analyze the Dockerfile and create a pull request with improvements for:
-- Security improvements
-- Size reduction opportunities
-- Best practices recommendations
-- Performance optimizations
-
-After execution, the module will output the URL of the newly created pull request, where you can review all suggested changes.
+Also enable [the PR reviewer agent](../pr-reviewer) so the PR can be reviewed by another Agent.
