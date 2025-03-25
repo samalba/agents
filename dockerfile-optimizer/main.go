@@ -72,7 +72,7 @@ func askLLM(ws *dagger.Workspace, dockerfile, extraContext string) *dagger.LLM {
 You are a Platform Engineer with deep knowledge of Dockerfiles. You have access to a workspace.
 Use the read, write and build tools to complete the following assignment:
 
-Assignment: Optimize the Dockerfile for reducing its size, number of layers, and build time. And when possible, increasing the security level of the image by implementing best practices.
+Assignment: Optimize the Dockerfile (found at "$dockerfile") for reducing its size, number of layers, and build time. And when possible, increasing the security level of the image by implementing best practices.
 
 Follow these guidelines:
 - Make all the optimizations you can think of at once, don't try to optimize it step by step.
@@ -115,7 +115,8 @@ func (m *DockerfileOptimizer) optimizeDockerfile(ctx context.Context, src *dagge
 
 	extraContext := ""
 	answer := ""
-	var lastState *dagger.Workspace
+	lastState := ws
+
 	var lastImgInfo []int
 	// Try 5 times to optimize the Dockerfile
 	for range make([]int, 5) {
@@ -126,7 +127,7 @@ func (m *DockerfileOptimizer) optimizeDockerfile(ctx context.Context, src *dagge
 			return nil, nil, "", fmt.Errorf("failed to ask LLM: %w", err)
 		}
 
-		lastState := llm.Workspace()
+		lastState = llm.Workspace()
 
 		// Compare the optimized Dockerfile with the original one
 		lastImgInfo, err = imageInfo(ctx, lastState.Workdir(), dockerfile)
