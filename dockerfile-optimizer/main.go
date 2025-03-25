@@ -64,8 +64,8 @@ func imageInfo(ctx context.Context, dir *dagger.Directory, path string) ([]int, 
 }
 
 func askLLM(ws *dagger.Workspace, dockerfile, extraContext string) *dagger.LLM {
-	llm := dag.Llm().
-		SetWorkspace("workspace", ws).
+	llm := dag.LLM().
+		WithWorkspace(ws).
 		WithPromptVar("dockerfile", dockerfile).
 		WithPromptVar("extra_context", extraContext).
 		WithPrompt(`
@@ -126,7 +126,7 @@ func (m *DockerfileOptimizer) optimizeDockerfile(ctx context.Context, src *dagge
 			return nil, nil, "", fmt.Errorf("failed to ask LLM: %w", err)
 		}
 
-		lastState = llm.Workspace()
+		lastState := llm.Workspace()
 
 		// Compare the optimized Dockerfile with the original one
 		lastImgInfo, err = imageInfo(ctx, lastState.Workdir(), dockerfile)
@@ -144,7 +144,6 @@ func (m *DockerfileOptimizer) optimizeDockerfile(ctx context.Context, src *dagge
 		extraContext += fmt.Sprintf("- The number of layers is %d in the original image, and %d layers in the optimized version.\n", originalImgInfo[0], lastImgInfo[0])
 		extraContext += fmt.Sprintf("- The original image size is %d bytes, and the optimized image size is %d bytes.\n\n", originalImgInfo[1], lastImgInfo[1])
 		extraContext += "Please make the necessary changes to the Dockerfile to improve the image size and number of layers.\n"
-		// FIXME: add the modified Dockerfile to the extra context?
 	}
 
 	// Check if the workspace has been modified
@@ -184,7 +183,7 @@ func createPR(ctx context.Context, githubToken *dagger.Secret, repoURL string, s
 		return "", fmt.Errorf("got empty diff on feature branch (llm did not make any changes)")
 	}
 
-	return featureBranch.CreatePullRequestWithLlm(ctx, llmAnswer)
+	return featureBranch.CreatePullRequestWithLLM(ctx, llmAnswer)
 }
 
 // Optimize a Dockerfile from a remote Github repository, and open a PR with the changes

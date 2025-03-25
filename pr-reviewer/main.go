@@ -50,7 +50,7 @@ func (m *PrReviewer) ReviewPr(ctx context.Context, githubToken *dagger.Secret, q
 		additionalInstructions = fmt.Sprintf("\n\nAdditional Instructions: %s\n", additionalInstructions)
 	}
 
-	llm := dag.Llm().
+	llm := dag.LLM().
 		WithPromptVar("prTitle", prTitle).
 		WithPromptVar("prBody", prBody).
 		WithPromptVar("prDiff", prDiff).

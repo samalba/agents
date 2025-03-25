@@ -63,7 +63,7 @@ func (m *FeatureBranch) WithChanges(changes *dagger.Directory) *FeatureBranch {
 	return m
 }
 
-func applyChanges(ctx context.Context, baseImage *dagger.Container, changes *dagger.Directory) *dagger.Container {
+func applyChanges(baseImage *dagger.Container, changes *dagger.Directory) *dagger.Container {
 	return baseImage.
 		WithMountedDirectory("/changes", changes).
 		WithExec([]string{"rsync", "-a", "/changes/", "/src"})
@@ -80,7 +80,7 @@ func (m *FeatureBranch) Diff(ctx context.Context, namesOnly bool) (string, error
 		diffArgs = append(diffArgs, "--name-only")
 	}
 
-	return applyChanges(ctx, m.Ctr, m.Changes).
+	return applyChanges(m.Ctr, m.Changes).
 		WithExec(diffArgs).
 		Stdout(ctx)
 }
@@ -91,7 +91,7 @@ func (m *FeatureBranch) Commit(ctx context.Context, message string) (*FeatureBra
 		return nil, errors.New("no changes to commit")
 	}
 
-	m.Ctr = applyChanges(ctx, m.Ctr, m.Changes).
+	m.Ctr = applyChanges(m.Ctr, m.Changes).
 		WithExec([]string{"git", "checkout", "-b", m.BranchName}).
 		WithExec([]string{"git", "add", "."}).
 		WithExec([]string{"git", "commit", "-m", message})
@@ -142,7 +142,7 @@ func (m *FeatureBranch) CreatePullRequestWithLLM(ctx context.Context, additional
 		return "", err
 	}
 	// Augment the PR with the LLM
-	llm := dag.Llm().
+	llm := dag.LLM().
 		WithPromptVar("diff", diff).
 		WithPromptVar("additionalContext", additionalContext).
 		WithPrompt(`Generate a detailed description of the changes in the PR.
