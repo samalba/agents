@@ -1,8 +1,25 @@
 # Dockerfile Optimizer 🤖
 
-## What is this?
+## Overview
 
-A Dagger module for optimizing Dockerfiles using AI assistance. This tool analyzes your Dockerfile and suggests improvements for better efficiency, security, and best practices. Once the analysis is complete, it automatically creates a pull request with the suggested optimizations.
+Dockerfile Optimizer demonstrates how to automatically improve Dockerfiles using LLM-powered agents and the Dagger platform. This demo shows an end-to-end AI workflow: analyzing a Dockerfile, suggesting improvements, and opening a pull request—all without human intervention.
+
+Built with [Dagger](https://dagger.io), the open platform for agentic software.
+
+## Demo
+
+[![Watch the demo](https://img.youtube.com/vi/WN9IBSD55Kk/hqdefault.jpg)](https://youtu.be/WN9IBSD55Kk)
+
+What this shows:
+An AI agent uses the Dagger API to find and optimize a Dockerfile in a GitHub repository. Once optimized, it opens a pull request. A second Dagger-powered agent picks up the PR and reviews it—showing how multiple agents can collaborate in an automated DevOps pipeline.
+
+## Highlights
+
+LLM-Driven Automation: The agent uses OpenAI to interpret and optimize Dockerfiles, relying on prompts and structured tools defined in a Dagger workspace.
+
+Composable Modules: Built as a reusable Dagger module, the agent leverages Dagger’s container API for tasks like cloning repos, reading files, and writing PRs.
+
+Agent Collaboration: Demonstrates a multi-agent workflow, where one agent submits code changes and another reviews them - enabling scalable, intelligent automation in software delivery.
 
 ## How to use it?
 
