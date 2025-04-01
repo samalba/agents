@@ -17,7 +17,7 @@ package main
 import (
 	"context"
 	"dagger/workspace/internal/dagger"
-	"strings"
+	"fmt"
 )
 
 type Workspace struct {
@@ -36,8 +36,8 @@ func New() *Workspace {
 }
 
 // Add packages to the container, using apk
-func (w *Workspace) AddPackages(ctx context.Context, pkgs ...string) (*Workspace, error) {
-	ctr := w.Container.WithExec([]string{"apk", "add", strings.Join(pkgs, " ")})
+func (w *Workspace) AddPackages(ctx context.Context, pkgs string) (*Workspace, error) {
+	ctr := w.Container.WithExec([]string{"sh", "-c", fmt.Sprintf("apk add %s", pkgs)})
 	// Check the packages were added before updating the workspace
 	_, err := ctr.Sync(ctx)
 	if err != nil {

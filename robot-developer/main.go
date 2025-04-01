@@ -22,16 +22,20 @@ import (
 type RobotDeveloper struct{}
 
 // Returns a container that echoes whatever string argument is provided
-func (m *RobotDeveloper) Ask(ctx context.Context, prompt string) *dagger.Container {
-	return dag.LLM().
-		WithWorkspace(dag.Workspace()).
-		WithPromptVar("prompt", prompt).
-		WithPrompt(`You are a Robot Developer with deep knowledge of programming and software development best practices.
-You have acess to workspace which you can use to install system packages, write files, run commands, etc.
-The assignment must result in a final workspace that contains the result of your work.
+func (m *RobotDeveloper) Ask(ctx context.Context, assignment string) *dagger.Container {
+	workspace := dag.Workspace()
+	env := dag.Env().
+		WithWorkspaceInput("before", workspace, "these are the tools to complete the task").
+		WithStringInput("assignment", assignment, "this is the assignment, complete it").
+		WithWorkspaceOutput("after", "Final state of the workspace after completing the assignment")
 
-Assignment: $prompt
-`).
-		Workspace().
-		Container()
+	llm := dag.LLM().
+		WithEnv(env).
+		WithPrompt(`You are a Robot Developer with deep knowledge of programming and software development best practices.
+Use the tools in the workspace to complete the assignment. You can install packages, run shell commands and write files.
+Do not rely on system libraries dependencies and instead implement the dependencies yourself whenever it's possible.
+Do not stop until the code builds with no errors.`).
+		Env().Output("after").AsWorkspace()
+
+	return llm.Container()
 }
