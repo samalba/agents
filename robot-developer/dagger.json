@@ -1,0 +1,13 @@
+{
+  "name": "robot-developer",
+  "engineVersion": "v0.18.0",
+  "sdk": {
+    "source": "go"
+  },
+  "dependencies": [
+    {
+      "name": "workspace",
+      "source": "workspace"
+    }
+  ]
+}
