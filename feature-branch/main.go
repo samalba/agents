@@ -141,10 +141,14 @@ func (m *FeatureBranch) CreatePullRequestWithLLM(ctx context.Context, additional
 	if err != nil {
 		return "", err
 	}
+
+	env := dag.Env().
+		WithStringInput("diff", diff, "This the diff of the PullRequest to review").
+		WithStringInput("additionalContext", additionalContext, "Optional additional context for the PR review (can be empty)")
+
 	// Augment the PR with the LLM
 	llm := dag.LLM().
-		WithPromptVar("diff", diff).
-		WithPromptVar("additionalContext", additionalContext).
+		WithEnv(env).
 		WithPrompt(`Generate a detailed description of the changes in the PR.
 Include the following information:
 - The changes made to the code
@@ -152,13 +156,11 @@ Include the following information:
 - Any potential risks or considerations
 - Any other relevant details
 
-Take into account the following additional context:
-$additionalContext
-
-And take into account the following diff, this is the output of the git diff command:
+PR Diff:
 $diff
 
-Only output the description, nothing else.
+Additional Context:
+$additionalContext
 `)
 	generatedDescription, err := llm.LastReply(ctx)
 	if err != nil {
