@@ -64,10 +64,14 @@ func imageInfo(ctx context.Context, dir *dagger.Directory, path string) ([]int, 
 }
 
 func askLLM(ws *dagger.Workspace, dockerfile, extraContext string) *dagger.LLM {
+	env := dag.Env().
+		WithWorkspaceInput("workspace", ws, "The workspace to use for completing the task").
+		WithStringInput("dockerfile", dockerfile, "The Dockerfile to optimize").
+		WithStringInput("extra_context", extraContext, "Optional additional context for the Dockerfile optimization (can be empty)").
+		WithWorkspaceOutput("workspace", "The workspace after the Dockerfile has been optimized")
+
 	llm := dag.LLM().
-		WithWorkspace(ws).
-		WithPromptVar("dockerfile", dockerfile).
-		WithPromptVar("extra_context", extraContext).
+		WithEnv(env).
 		WithPrompt(`
 You are a Platform Engineer with deep knowledge of Dockerfiles. You have access to a workspace.
 Use the read, write and build tools to complete the following assignment:
@@ -127,7 +131,7 @@ func (m *DockerfileOptimizer) optimizeDockerfile(ctx context.Context, src *dagge
 			return nil, nil, "", fmt.Errorf("failed to ask LLM: %w", err)
 		}
 
-		lastState = llm.Workspace()
+		lastState = llm.Env().Output("workspace").AsWorkspace()
 
 		// Compare the optimized Dockerfile with the original one
 		lastImgInfo, err = imageInfo(ctx, lastState.Workdir(), dockerfile)

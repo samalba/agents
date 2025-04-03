@@ -37,9 +37,9 @@ Run an optimization from the Dagger Shell:
 ```shell
 export OPENAI_API_KEY="your-openai-api-key"
 export GITHUB_TOKEN="your-github-token"
-dagger shell -c "optimize-dockerfile GITHUB_TOKEN <REPO_URL>"
+dagger shell -c "optimize-dockerfile-from-github GITHUB_TOKEN <REPO_URL>"
 # Example:
-dagger shell -c "optimize-dockerfile GITHUB_TOKEN https://github.com/samalba/demo-app"
+dagger shell -c "optimize-dockerfile-from-github GITHUB_TOKEN https://github.com/samalba/demo-app"
 ```
 
 The module will:
