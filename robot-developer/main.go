@@ -25,8 +25,8 @@ type RobotDeveloper struct{}
 func (m *RobotDeveloper) Ask(ctx context.Context, assignment string) *dagger.Container {
 	workspace := dag.Workspace()
 	env := dag.Env().
-		WithWorkspaceInput("before", workspace, "these are the tools to complete the task").
-		WithStringInput("assignment", assignment, "this is the assignment, complete it").
+		WithWorkspaceInput("before", workspace, "These are the tools to complete the assignment").
+		WithStringInput("assignment", assignment, "This describes the assignment to complete").
 		WithWorkspaceOutput("after", "Final state of the workspace after completing the assignment")
 
 	llm := dag.LLM().
