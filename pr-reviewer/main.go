@@ -50,11 +50,14 @@ func (m *PrReviewer) ReviewPr(ctx context.Context, githubToken *dagger.Secret, q
 		additionalInstructions = fmt.Sprintf("\n\nAdditional Instructions: %s\n", additionalInstructions)
 	}
 
+	env := dag.Env().
+		WithStringInput("prTitle", prTitle, "The title of the PullRequest to review").
+		WithStringInput("prBody", prBody, "The body of the PullRequest to review").
+		WithStringInput("prDiff", prDiff, "The diff of the PullRequest to review").
+		WithStringInput("additionalInstructions", additionalInstructions, "Optional additional context for the PR review (can be empty)")
+
 	llm := dag.LLM().
-		WithPromptVar("prTitle", prTitle).
-		WithPromptVar("prBody", prBody).
-		WithPromptVar("prDiff", prDiff).
-		WithPromptVar("additionalInstructions", additionalInstructions).
+		WithEnv(env).
 		WithPrompt(`Review the following Pull Request:
 
 PR Title:
