@@ -8,7 +8,7 @@ import (
 
 // Creates a Mutagen agent that can be used to sync with a host
 //
-// $ dagger call mutagen-agent up --authorized_keys ~/.ssh/id_ed25519.pub --ports 1222:22
+// $ dagger call mutagen-agent --authorized_keys ~/.ssh/id_ed25519.pub up --ports 1222:22
 // $ mutagen sync create --name=MyCode ./my-code root@localhost:1222:~/dagger
 // $ mutagen sync monitor MyCode
 func (m *CodeCompanion) MutagenAgent(

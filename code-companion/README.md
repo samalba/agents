@@ -12,14 +12,14 @@ Code Companion is an agent designed to facilitate seamless development workflows
 
 ### Starting File Replication
 
-Run the following commands in your terminal to start file replication:
+Run the following commands in a first terminal to start file replication:
 
 ```sh
 # 1. Create a local directory that will be used for replication
 mkdir -p ./my-code
 
 # 2. Start the Mutagen agent (this will use SSH to replicate a Dagger shared Cache volume)
-dagger -m github.com/samalba/agents/code-companion call mutagen-agent up --authorized_keys ~/.ssh/id_ed25519.pub --ports 1222:22
+dagger -m github.com/samalba/agents/code-companion call mutagen-agent --authorized_keys ~/.ssh/id_ed25519.pub up --ports 1222:22
 ```
 
 In another terminal, run:
