@@ -5,3 +5,5 @@ This repository contains examples of AI agents built with [Dagger](https://githu
 - [dockerfile-optimizer](./dockerfile-optimizer): an agent that analyzes your Dockerfile and suggests improvements for better efficiency, security, and best practices.
 - [feature-branch](./feature-branch): an agent that manages code changes on a git repository and interacts via a Pull Request.
 - [pr-reviewer](./pr-reviewer): an agent that reviews Pull Requests and suggests improvements.
+- [robot-developer](./robot-developer): an agent that mimic a developer.
+- [code-companion](./code-companion): an agent who can code and interact with your local dev environment.
