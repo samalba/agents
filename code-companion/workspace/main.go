@@ -18,6 +18,8 @@ import (
 	"context"
 	"dagger/workspace/internal/dagger"
 	"fmt"
+	"path"
+	"strings"
 )
 
 type Workspace struct {
@@ -75,4 +77,20 @@ func (w *Workspace) RunShellCommand(ctx context.Context, cmd string) (string, er
 	}
 	w.Container = ctr
 	return output, nil
+}
+
+// List the content of a directory
+func (w *Workspace) ListDirectory(ctx context.Context, path string) (string, error) {
+	entries, err := w.Container.Directory("/src").Entries(ctx, dagger.DirectoryEntriesOpts{Path: path})
+	if err != nil {
+		return "", err
+	}
+	output := strings.Join(entries, "\n")
+	return output, nil
+}
+
+// Read a file from the container, takes the filename and returns the content
+func (w *Workspace) ReadFile(ctx context.Context, filename string) (string, error) {
+	filename = path.Join("/src", filename)
+	return w.Container.File(filename).Contents(ctx)
 }

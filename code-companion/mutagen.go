@@ -36,7 +36,7 @@ func (m *CodeCompanion) MutagenAgent(
 			Permissions: 0600,
 		}).
 		// Ignore the error with chown (unknown user root.root)
-		WithExec([]string{"sh", "-c", "sed -i 's/set -e//' /entrypoint.sh"}).
+		WithExec([]string{"sed", "-i", "s/set -e//", "/entrypoint.sh"}).
 		WithMountedCache("/root/dagger", dag.CacheVolume("MyCode"), dagger.ContainerWithMountedCacheOpts{
 			Sharing: dagger.CacheSharingModeShared,
 		}).
