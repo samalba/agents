@@ -18,8 +18,7 @@ import (
 	"context"
 	"dagger/workspace/internal/dagger"
 	"fmt"
-	"path"
-	"strings"
+	"time"
 )
 
 type Workspace struct {
@@ -70,7 +69,9 @@ func (w *Workspace) WriteFile(ctx context.Context, filename string, content stri
 
 // Run shell command in the container and return the output
 func (w *Workspace) RunShellCommand(ctx context.Context, cmd string) (string, error) {
-	ctr := w.Container.WithExec([]string{"bash", "-c", cmd})
+	ctr := w.Container.
+		WithEnvVariable("CACHE_BUSTER", time.Now().String()).
+		WithExec([]string{"bash", "-c", cmd})
 	output, err := ctr.Stdout(ctx)
 	if err != nil {
 		return "", err
@@ -81,16 +82,10 @@ func (w *Workspace) RunShellCommand(ctx context.Context, cmd string) (string, er
 
 // List the content of a directory
 func (w *Workspace) ListDirectory(ctx context.Context, path string) (string, error) {
-	entries, err := w.Container.Directory("/src").Entries(ctx, dagger.DirectoryEntriesOpts{Path: path})
-	if err != nil {
-		return "", err
-	}
-	output := strings.Join(entries, "\n")
-	return output, nil
+	return w.RunShellCommand(ctx, fmt.Sprintf("ls -l %q", path))
 }
 
 // Read a file from the container, takes the filename and returns the content
 func (w *Workspace) ReadFile(ctx context.Context, filename string) (string, error) {
-	filename = path.Join("/src", filename)
-	return w.Container.File(filename).Contents(ctx)
+	return w.RunShellCommand(ctx, fmt.Sprintf("cat %q", filename))
 }
