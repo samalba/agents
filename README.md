@@ -7,3 +7,5 @@ This repository contains examples of AI agents built with [Dagger](https://githu
 - [pr-reviewer](./pr-reviewer): an agent that reviews Pull Requests and suggests improvements.
 - [robot-developer](./robot-developer): an agent that mimic a developer.
 - [code-companion](./code-companion): an agent who can code and interact with your local dev environment.
+
+✨
