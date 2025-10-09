@@ -8,4 +8,4 @@ This repository contains examples of AI agents built with [Dagger](https://githu
 - [robot-developer](./robot-developer): an agent that mimic a developer.
 - [code-companion](./code-companion): an agent who can code and interact with your local dev environment.
 
-✨
+✨ 😊
