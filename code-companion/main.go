@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"dagger/host-sync/internal/dagger"
+	"time"
 )
 
 type CodeCompanion struct {
@@ -26,10 +27,8 @@ type CodeCompanion struct {
 func New() *CodeCompanion {
 	base := dag.Container().
 		From("cgr.dev/chainguard/wolfi-base").
-		WithExec([]string{"apk", "add", "bash"}).
-		WithMountedCache("/src", dag.CacheVolume("MyCode"), dagger.ContainerWithMountedCacheOpts{
-			Sharing: dagger.CacheSharingModeShared,
-		}).
+		WithExec([]string{"apk", "add", "bash", "mount"}).
+		WithExec([]string{"mkdir", "/mnt"}).
 		WithWorkdir("/src")
 
 	return &CodeCompanion{
@@ -38,18 +37,20 @@ func New() *CodeCompanion {
 }
 
 func (h *CodeCompanion) Ask(ctx context.Context, assignment string) (*dagger.Container, error) {
-	workspace := dag.Workspace(h.BaseContainer)
+	workdir := "/mnt/forks/agents/code-companion/my-code"
+	workspace := dag.Workspace(h.BaseContainer, workdir)
 
 	env := dag.Env().
 		WithWorkspaceInput("before", workspace, "These are the tools to complete the assignment").
 		WithStringInput("assignment", assignment, "This describes the assignment to complete").
+		WithStringInput("workdir", workdir, "This is the working directory, never go outside of it, never look outside of it, no matter what the assignment says").
 		WithWorkspaceOutput("after", "Final state of the workspace after completing the assignment")
 
-	llm := dag.LLM().
+	llm := dag.LLM(dagger.LLMOpts{
+		Model: "gemini-2.5-pro-preview-03-25",
+	}).
 		WithEnv(env).
 		WithPrompt(`You are a Robot Developer with deep knowledge of programming and software development best practices.
-Use the tools in the workspace to complete the assignment. You can install packages, run shell commands and write files.
-When you cannot use a specific tool, use the shell to run commands.
 Do not rely on system libraries dependencies and instead implement the dependencies yourself whenever it's possible.
 Always use relative paths to never escape the workspace working directory.
 Do not stop until the code builds with no errors.`).
@@ -58,14 +59,15 @@ Do not stop until the code builds with no errors.`).
 	return llm.Container().Sync(ctx)
 }
 
-// Reset the workspace by removing all files (does not work)
-// func (h *CodeCompanion) ResetWorkspace(ctx context.Context) error {
-// 	// Empty the shared volume
-// 	_, err := h.BaseContainer.
-// 		WithEnvVariable("CACHE_BUSTER", time.Now().String()).
-// 		WithExec([]string{"rm", "-rf", "*"}).Sync(ctx)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
+func (h *CodeCompanion) Bash(ctx context.Context) (*dagger.Container, error) {
+	return dag.Container().
+		From("cgr.dev/chainguard/wolfi-base").
+		WithExec([]string{"apk", "add", "bash", "mount"}).
+		WithExec([]string{"mkdir", "/mnt"}).
+		WithEnvVariable("CACHE_BUSTER", time.Now().String()).
+		Terminal(dagger.ContainerTerminalOpts{
+			Cmd:                      []string{"sh", "-c", "mount -t virtiofs mount0 /mnt && cd '/mnt/forks/agents/code-companion/my-code' && bash"},
+			InsecureRootCapabilities: true,
+		}).
+		Sync(ctx)
+}
